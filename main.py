@@ -233,7 +233,6 @@ class MainWindow(QMainWindow):
         url_row.addWidget(analyze_button)
         url_row.addWidget(ytdlp_button)
         url_row.addWidget(self.ytdlp_download_button)
-        url_row.addWidget(self.cookie_browser)
         url_row.addWidget(cookies_button)
         root.addLayout(url_row)
         cookie_row = QHBoxLayout()
@@ -386,13 +385,14 @@ class MainWindow(QMainWindow):
         if self.download_thread is not None and self.download_thread.isRunning():
             return
         self.ytdlp_download_button.setEnabled(False)
-        browser = self.cookie_browser.currentData()
+        browser = None if self.cookies_file else self.cookie_browser.currentData()
+        using_cookies = bool(self.cookies_file or browser)
         self.status.setText(
-            "正在启动 yt-dlp 下载（将读取所选浏览器 Cookie）……"
-            if browser else "正在启动 yt-dlp 下载……"
+            "正在启动 yt-dlp 下载（使用本机 YouTube 登录状态）……"
+            if using_cookies else "正在启动 yt-dlp 下载……"
         )
         self.download_thread = QThread(self)
-        self.download_worker = YtDlpDownloadWorker(address, browser)
+        self.download_worker = YtDlpDownloadWorker(address, browser, self.cookies_file)
         self.download_worker.moveToThread(self.download_thread)
         self.download_thread.started.connect(self.download_worker.run)
         self.download_worker.progress.connect(self.status.setText)
