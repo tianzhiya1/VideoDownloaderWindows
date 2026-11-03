@@ -12,6 +12,8 @@
 - Windows 便携 ZIP，无需单独安装 Python、Deno 或 FFmpeg。
 
 ## 使用 YouTube
+
+- 下载按钮旁可选择“不读取登录 Cookie”、Chrome、Edge 或 Firefox。若 YouTube 提示验证机器人，请先在所选浏览器中登录 YouTube，再选择对应浏览器重试。读取的是本机浏览器 Cookie，不会上传到 GitHub。使用 Chrome/Edge 时建议先完全退出浏览器，避免 Cookie 数据库被锁定。
 1. 复制 YouTube 视频页面链接并粘贴到软件顶部网址栏。
 2. 点击“**YouTube / yt-dlp 解析**”可识别视频媒体地址。
 3. 点击“**下载视频**”可直接下载并合并音视频。
