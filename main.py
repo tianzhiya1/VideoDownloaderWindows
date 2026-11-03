@@ -243,7 +243,7 @@ class MainWindow(QMainWindow):
                 raise RuntimeError("yt-dlp 没有返回视频信息")
             media_url = info.get("url")
             if media_url:
-                self.add_candidate(media_url)
+                self.add_candidate(media_url, force=True)
             else:
                 requested = info.get("requested_formats") or []
                 formats = requested or info.get("formats") or []
@@ -316,11 +316,12 @@ class MainWindow(QMainWindow):
         for item in set(MEDIA_RE.findall(html or "")):
             self.add_candidate(item.replace("&amp;", "&"))
 
-    def add_candidate(self, address):
-        if not media_kind(address) or address in self.candidates:
+    def add_candidate(self, address, force=False):
+        kind = media_kind(address) or ("yt-dlp 视频流" if force else "")
+        if not kind or address in self.candidates:
             return
         self.candidates.append(address)
-        label = f"{media_kind(address)}  |  {address[:150]}"
+        label = f"{kind}  |  {address[:150]}"
         self.list.addItem(QListWidgetItem(label))
         if self.list.count() == 1:
             self.list.setCurrentRow(0)
@@ -330,8 +331,9 @@ class MainWindow(QMainWindow):
 
     def on_selection_changed(self, row):
         if 0 <= row < len(self.candidates):
+            kind = media_kind(self.candidates[row]) or "yt-dlp 视频流"
             self.status.setText(
-                f"当前选择：{media_kind(self.candidates[row])}。点击下方唯一按钮查看并复制链接。"
+                f"当前选择：{kind}。点击下方唯一按钮查看并复制链接。"
             )
 
     def copy_selected(self):
