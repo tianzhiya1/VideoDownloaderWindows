@@ -4,8 +4,9 @@ import requests
 import os
 import shutil
 import yt_dlp
+import imageio_ffmpeg
 from urllib.parse import urlparse
-from PySide6.QtCore import QObject, Signal, QUrl, Qt
+from PySide6.QtCore import QObject, Signal, QUrl, Qt, QThread
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -15,7 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
 MEDIA_EXTENSIONS = (
@@ -100,6 +101,56 @@ class MediaRequestInterceptor(QWebEngineUrlRequestInterceptor):
         if media_kind(address):
             self.signals.found.emit(address)
 
+class YtDlpDownloadWorker(QObject):
+    progress = Signal(str)
+    finished = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, address):
+        super().__init__()
+        self.address = address
+
+    def run(self):
+        try:
+            output_dir = os.path.join(os.path.expanduser("~"), "Downloads", "VideoDownloader")
+            os.makedirs(output_dir, exist_ok=True)
+            deno_path = os.path.join(
+                getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "deno.exe"
+            )
+            if not os.path.isfile(deno_path):
+                deno_path = shutil.which("deno")
+            ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+            options = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+                "merge_output_format": "mp4",
+                "ffmpeg_location": ffmpeg_path,
+                "outtmpl": os.path.join(output_dir, "%(title).180B-%(id)s.%(ext)s"),
+                "progress_hooks": [self.on_progress],
+                "socket_timeout": 30,
+                "retries": 3,
+            }
+            if deno_path:
+                options["js_runtimes"] = {"deno": {"path": deno_path}}
+            with yt_dlp.YoutubeDL(options) as ydl:
+                ydl.download([self.address])
+            self.finished.emit(output_dir)
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+    def on_progress(self, data):
+        state = data.get("status")
+        if state == "downloading":
+            percent = data.get("_percent_str", "").strip()
+            speed = data.get("_speed_str", "").strip()
+            eta = data.get("_eta_str", "").strip()
+            self.progress.emit(f"下载中：{percent}  速度：{speed}  剩余：{eta}")
+        elif state == "finished":
+            self.progress.emit("视频流下载完成，正在合并音视频……")
+
+
 class CopyDialog(QDialog):
     def __init__(self, address, parent=None):
         super().__init__(parent)
@@ -136,6 +187,8 @@ class MainWindow(QMainWindow):
         self.signals = MediaSignals()
         self.signals.found.connect(self.add_candidate)
         self.interceptor = MediaRequestInterceptor(self.signals)
+        self.download_thread = None
+        self.download_worker = None
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -158,10 +211,13 @@ class MainWindow(QMainWindow):
         analyze_button.clicked.connect(self.analyze_page)
         ytdlp_button = QPushButton("YouTube / yt-dlp 解析")
         ytdlp_button.clicked.connect(self.analyze_with_ytdlp)
+        self.ytdlp_download_button = QPushButton("下载视频")
+        self.ytdlp_download_button.clicked.connect(self.download_with_ytdlp)
         url_row.addWidget(self.url_input, 1)
         url_row.addWidget(open_button)
         url_row.addWidget(analyze_button)
         url_row.addWidget(ytdlp_button)
+        url_row.addWidget(self.ytdlp_download_button)
         root.addLayout(url_row)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -270,6 +326,38 @@ class MainWindow(QMainWindow):
             self.status.setText(
                 f"yt-dlp 解析失败：{exc}\n可尝试更新软件，或检查视频是否公开可访问。"
             )
+
+    def download_with_ytdlp(self):
+        address = self.url_input.text().strip()
+        if not self.valid_http(address):
+            QMessageBox.warning(self, "地址无效", "请输入有效的 http 或 https 网页地址。")
+            return
+        if self.download_thread is not None and self.download_thread.isRunning():
+            return
+        self.ytdlp_download_button.setEnabled(False)
+        self.status.setText("正在启动 yt-dlp 下载……")
+        self.download_thread = QThread(self)
+        self.download_worker = YtDlpDownloadWorker(address)
+        self.download_worker.moveToThread(self.download_thread)
+        self.download_thread.started.connect(self.download_worker.run)
+        self.download_worker.progress.connect(self.status.setText)
+        self.download_worker.finished.connect(self.on_ytdlp_download_finished)
+        self.download_worker.failed.connect(self.on_ytdlp_download_failed)
+        self.download_worker.finished.connect(self.download_thread.quit)
+        self.download_worker.failed.connect(self.download_thread.quit)
+        self.download_thread.finished.connect(self.download_worker.deleteLater)
+        self.download_thread.finished.connect(self.download_thread.deleteLater)
+        self.download_thread.start()
+
+    def on_ytdlp_download_finished(self, folder):
+        self.ytdlp_download_button.setEnabled(True)
+        self.status.setText(f"下载完成，文件已保存到：{folder}")
+        QMessageBox.information(self, "下载完成", f"视频已保存到：\n{folder}")
+
+    def on_ytdlp_download_failed(self, message):
+        self.ytdlp_download_button.setEnabled(True)
+        self.status.setText(f"下载失败：{message}")
+        QMessageBox.warning(self, "下载失败", message)
 
     def analyze_page(self):
         address = self.url_input.text().strip()
