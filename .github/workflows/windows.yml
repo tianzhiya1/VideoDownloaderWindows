@@ -25,6 +25,11 @@ jobs:
           python-version: "3.11"
           architecture: "x64"
 
+      - name: Set up Deno runtime
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -32,8 +37,10 @@ jobs:
           pip install pyinstaller==6.11.1
 
       - name: Build Windows application
+        shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --windowed --name VideoDownloader main.py
+          $deno = (Get-Command deno).Source
+          pyinstaller --noconfirm --clean --windowed --name VideoDownloader --collect-all yt_dlp --collect-all yt_dlp_ejs --add-binary "$deno;." main.py
 
       - name: Package portable application
         shell: pwsh
@@ -49,11 +56,12 @@ jobs:
 
       - name: Publish GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          if (gh release view v1.0.0 --repo "$env:GITHUB_REPOSITORY" 2>$null) {
-            gh release upload v1.0.0 VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --clobber
+          $version = "v1.1.0"
+          if (gh release view $version --repo "$env:GITHUB_REPOSITORY" 2>$null) {
+            gh release upload $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
-            gh release create v1.0.0 VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --title "VideoDownloader Windows v1.0.0" --notes "Independent Windows video media URL extractor."
+            gh release create $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --title "VideoDownloader Windows $version" --notes "Adds yt-dlp-powered YouTube and supported-site media extraction. Deno JS runtime is bundled for YouTube player challenge support. No DRM or paywall bypass."
           }
