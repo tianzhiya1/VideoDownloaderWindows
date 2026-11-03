@@ -11,7 +11,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QLabel, QListWidget, QListWidgetItem,
-    QMessageBox, QDialog, QTextEdit, QSplitter, QComboBox
+    QMessageBox, QDialog, QTextEdit, QSplitter, QComboBox, QFileDialog
 )
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -106,10 +106,11 @@ class YtDlpDownloadWorker(QObject):
     finished = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, address, browser):
+    def __init__(self, address, browser=None, cookies_file=None):
         super().__init__()
         self.address = address
         self.browser = browser
+        self.cookies_file = cookies_file
 
     def run(self):
         try:
@@ -220,16 +221,13 @@ class MainWindow(QMainWindow):
         self.ytdlp_download_button = QPushButton("下载视频")
         self.ytdlp_download_button.clicked.connect(self.download_with_ytdlp)
         self.cookie_browser = QComboBox()
-        self.cookie_browser.addItem("不读取登录 Cookie", None)
-        self.cookie_browser.addItem("Chrome 登录状态", "chrome")
-        self.cookie_browser.addItem("Microsoft Edge 登录状态", "edge")
-        self.cookie_browser.addItem("Firefox 登录状态", "firefox")
-        self.cookie_browser = QComboBox()
         self.cookie_browser.addItem("不读取浏览器 Cookie", "")
         self.cookie_browser.addItem("Chrome 登录", "chrome")
         self.cookie_browser.addItem("Edge 登录", "edge")
         self.cookie_browser.addItem("Firefox 登录", "firefox")
         self.cookie_browser.addItem("Brave 登录", "brave")
+        cookies_button = QPushButton("导入 cookies.txt")
+        cookies_button.clicked.connect(self.import_youtube_cookies)
         url_row.addWidget(self.url_input, 1)
         url_row.addWidget(open_button)
         url_row.addWidget(analyze_button)
@@ -319,6 +317,9 @@ class MainWindow(QMainWindow):
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
             if self.cookies_file and os.path.isfile(self.cookies_file):
                 options["cookiefile"] = self.cookies_file
+            browser = self.cookie_browser.currentData()
+            if browser:
+                options["cookiesfrombrowser"] = (browser, None, None, None)
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(address, download=False)
             if not info:
