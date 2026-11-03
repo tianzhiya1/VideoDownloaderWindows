@@ -346,8 +346,13 @@ class MainWindow(QMainWindow):
         self.download_worker.finished.connect(self.download_thread.quit)
         self.download_worker.failed.connect(self.download_thread.quit)
         self.download_thread.finished.connect(self.download_worker.deleteLater)
+        self.download_thread.finished.connect(self.cleanup_ytdlp_thread)
         self.download_thread.finished.connect(self.download_thread.deleteLater)
         self.download_thread.start()
+
+    def cleanup_ytdlp_thread(self):
+        self.download_thread = None
+        self.download_worker = None
 
     def on_ytdlp_download_finished(self, folder):
         self.ytdlp_download_button.setEnabled(True)
