@@ -63,5 +63,5 @@ jobs:
           if (gh release view $version --repo "$env:GITHUB_REPOSITORY" 2>$null) {
             gh release upload $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
-            gh release create $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --title "VideoDownloader Windows $version" --notes "Adds yt-dlp-powered YouTube and supported-site media extraction. Deno JS runtime is bundled for YouTube player challenge support. No DRM or paywall bypass."
+            gh release create $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --title "VideoDownloader Windows $version" --notes "Adds optional local browser-cookie support for YouTube sign-in verification, plus yt-dlp and bundled Deno/FFmpeg. No DRM or paywall bypass."
           }
