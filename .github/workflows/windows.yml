@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           $deno = (Get-Command deno).Source
-          pyinstaller --noconfirm --clean --windowed --name VideoDownloader --collect-all yt_dlp --collect-all yt_dlp_ejs --add-binary "$deno;." main.py
+          pyinstaller --noconfirm --clean --windowed --name VideoDownloader --collect-all yt_dlp --collect-all yt_dlp_ejs --collect-all imageio_ffmpeg --add-binary "$deno;." main.py
 
       - name: Package portable application
         shell: pwsh
@@ -59,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $version = "v1.3.0"
+          $version = "v1.4.0"
           if (gh release view $version --repo "$env:GITHUB_REPOSITORY" 2>$null) {
             gh release upload $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
