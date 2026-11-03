@@ -59,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $version = "v1.5.0"
+          $version = "v1.6.0"
           if (gh release view $version --repo "$env:GITHUB_REPOSITORY" 2>$null) {
             gh release upload $version VideoDownloader-Windows-x64.zip --repo "$env:GITHUB_REPOSITORY" --clobber
           } else {
