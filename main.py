@@ -136,10 +136,10 @@ class YtDlpDownloadWorker(QObject):
             }
             if self.cookies_file and os.path.isfile(self.cookies_file):
                 options["cookiefile"] = self.cookies_file
+            elif self.browser:
+                options["cookiesfrombrowser"] = (self.browser, None, None, None)
             if deno_path:
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
-            if self.browser:
-                options["cookiesfrombrowser"] = (self.browser, None, None, None)
             with yt_dlp.YoutubeDL(options) as ydl:
                 ydl.download([self.address])
             self.finished.emit(output_dir)
@@ -317,9 +317,10 @@ class MainWindow(QMainWindow):
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
             if self.cookies_file and os.path.isfile(self.cookies_file):
                 options["cookiefile"] = self.cookies_file
-            browser = self.cookie_browser.currentData()
-            if browser:
-                options["cookiesfrombrowser"] = (browser, None, None, None)
+            else:
+                browser = self.cookie_browser.currentData()
+                if browser:
+                    options["cookiesfrombrowser"] = (browser, None, None, None)
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(address, download=False)
             if not info:
