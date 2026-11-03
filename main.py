@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
 MEDIA_EXTENSIONS = (
@@ -216,10 +216,8 @@ class MainWindow(QMainWindow):
         open_button.clicked.connect(self.open_page)
         analyze_button = QPushButton("分析网页直链")
         analyze_button.clicked.connect(self.analyze_page)
-        ytdlp_button = QPushButton("YouTube / yt-dlp 解析")
+        ytdlp_button = QPushButton("解析视频并获取下载链接")
         ytdlp_button.clicked.connect(self.analyze_with_ytdlp)
-        self.ytdlp_download_button = QPushButton("下载视频")
-        self.ytdlp_download_button.clicked.connect(self.download_with_ytdlp)
         self.cookie_browser = QComboBox()
         self.cookie_browser.addItem("不读取浏览器 Cookie", "")
         self.cookie_browser.addItem("Chrome 登录", "chrome")
@@ -232,7 +230,6 @@ class MainWindow(QMainWindow):
         url_row.addWidget(open_button)
         url_row.addWidget(analyze_button)
         url_row.addWidget(ytdlp_button)
-        url_row.addWidget(self.ytdlp_download_button)
         url_row.addWidget(cookies_button)
         root.addLayout(url_row)
         cookie_row = QHBoxLayout()
@@ -297,7 +294,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "地址无效", "请输入有效的 http 或 https 网页地址。")
             return
         self.reset_candidates()
-        self.status.setText("正在通过 yt-dlp 解析视频信息与可用媒体地址……")
+        self.status.setText("正在解析视频并提取浏览器下载链接……")
         try:
             options = {
                 "quiet": True,
@@ -343,7 +340,7 @@ class MainWindow(QMainWindow):
             title = info.get("title") or "视频"
             if self.candidates:
                 self.status.setText(
-                    f"yt-dlp 解析成功：{title}。已识别 {len(self.candidates)} 个媒体地址。"
+                    f"解析成功：{title}。已识别 {len(self.candidates)} 个媒体直链。选择链接并复制到浏览器下载。"
                 )
             else:
                 self.status.setText(
@@ -384,7 +381,6 @@ class MainWindow(QMainWindow):
             return
         if self.download_thread is not None and self.download_thread.isRunning():
             return
-        self.ytdlp_download_button.setEnabled(False)
         browser = None if self.cookies_file else self.cookie_browser.currentData()
         using_cookies = bool(self.cookies_file or browser)
         self.status.setText(
@@ -410,7 +406,6 @@ class MainWindow(QMainWindow):
         self.download_worker = None
 
     def on_ytdlp_download_finished(self, folder):
-        self.ytdlp_download_button.setEnabled(True)
         self.status.setText(f"下载完成，文件已保存到：{folder}")
         QMessageBox.information(self, "下载完成", f"视频已保存到：\n{folder}")
 
