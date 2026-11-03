@@ -1,6 +1,6 @@
 # VideoDownloader for Windows
 
-独立的 Windows 视频下载与媒体链接提取工具，已加入 yt-dlp，可下载 YouTube 和 yt-dlp 支持的公开视频页面。
+独立的 Windows 视频链接提取工具。输入视频网页后，由 yt-dlp 解析出可用媒体直链，复制后交给 Chrome、Edge 等浏览器下载；软件本身不下载视频文件。
 
 ## 功能
 - 内置 Chromium 浏览器（Qt WebEngine）。
