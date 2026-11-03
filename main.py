@@ -11,12 +11,12 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QLabel, QListWidget, QListWidgetItem,
-    QMessageBox, QDialog, QTextEdit, QSplitter
+    QMessageBox, QDialog, QTextEdit, QSplitter, QComboBox
 )
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
 MEDIA_EXTENSIONS = (
@@ -106,9 +106,10 @@ class YtDlpDownloadWorker(QObject):
     finished = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, address):
+    def __init__(self, address, browser):
         super().__init__()
         self.address = address
+        self.browser = browser
 
     def run(self):
         try:
@@ -134,6 +135,8 @@ class YtDlpDownloadWorker(QObject):
             }
             if deno_path:
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
+            if self.browser:
+                options["cookiesfrombrowser"] = (self.browser, None, None, None)
             with yt_dlp.YoutubeDL(options) as ydl:
                 ydl.download([self.address])
             self.finished.emit(output_dir)
@@ -213,12 +216,23 @@ class MainWindow(QMainWindow):
         ytdlp_button.clicked.connect(self.analyze_with_ytdlp)
         self.ytdlp_download_button = QPushButton("下载视频")
         self.ytdlp_download_button.clicked.connect(self.download_with_ytdlp)
+        self.cookie_browser = QComboBox()
+        self.cookie_browser.addItem("不读取浏览器 Cookie", "")
+        self.cookie_browser.addItem("Chrome 登录", "chrome")
+        self.cookie_browser.addItem("Edge 登录", "edge")
+        self.cookie_browser.addItem("Firefox 登录", "firefox")
+        self.cookie_browser.addItem("Brave 登录", "brave")
         url_row.addWidget(self.url_input, 1)
         url_row.addWidget(open_button)
         url_row.addWidget(analyze_button)
         url_row.addWidget(ytdlp_button)
         url_row.addWidget(self.ytdlp_download_button)
         root.addLayout(url_row)
+        cookie_row = QHBoxLayout()
+        cookie_row.addWidget(QLabel("YouTube 登录状态："))
+        cookie_row.addWidget(self.cookie_browser)
+        cookie_row.addWidget(QLabel("选择已登录 YouTube 的浏览器；请先完全关闭浏览器。"))
+        root.addLayout(cookie_row)
 
         splitter = QSplitter(Qt.Horizontal)
         self.web = QWebEngineView()
@@ -335,9 +349,13 @@ class MainWindow(QMainWindow):
         if self.download_thread is not None and self.download_thread.isRunning():
             return
         self.ytdlp_download_button.setEnabled(False)
-        self.status.setText("正在启动 yt-dlp 下载……")
+        browser = self.cookie_browser.currentData()
+        self.status.setText(
+            "正在启动 yt-dlp 下载（将读取所选浏览器 Cookie）……"
+            if browser else "正在启动 yt-dlp 下载……"
+        )
         self.download_thread = QThread(self)
-        self.download_worker = YtDlpDownloadWorker(address)
+        self.download_worker = YtDlpDownloadWorker(address, browser)
         self.download_worker.moveToThread(self.download_thread)
         self.download_thread.started.connect(self.download_worker.run)
         self.download_worker.progress.connect(self.status.setText)
