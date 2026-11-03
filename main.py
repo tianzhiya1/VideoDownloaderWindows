@@ -1,6 +1,9 @@
 import re
 import sys
 import requests
+import os
+import shutil
+import yt_dlp
 from urllib.parse import urlparse
 from PySide6.QtCore import QObject, Signal, QUrl, Qt
 from PySide6.QtGui import QGuiApplication
@@ -12,7 +15,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
 MEDIA_EXTENSIONS = (
@@ -153,9 +156,12 @@ class MainWindow(QMainWindow):
         open_button.clicked.connect(self.open_page)
         analyze_button = QPushButton("分析网页直链")
         analyze_button.clicked.connect(self.analyze_page)
+        ytdlp_button = QPushButton("YouTube / yt-dlp 解析")
+        ytdlp_button.clicked.connect(self.analyze_with_ytdlp)
         url_row.addWidget(self.url_input, 1)
         url_row.addWidget(open_button)
         url_row.addWidget(analyze_button)
+        url_row.addWidget(ytdlp_button)
         root.addLayout(url_row)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -207,6 +213,63 @@ class MainWindow(QMainWindow):
         self.reset_candidates()
         self.status.setText("正在加载网页并监听媒体请求……")
         self.web.setUrl(QUrl(address))
+
+    def analyze_with_ytdlp(self):
+        address = self.url_input.text().strip()
+        if not self.valid_http(address):
+            QMessageBox.warning(self, "地址无效", "请输入有效的 http 或 https 网页地址。")
+            return
+        self.reset_candidates()
+        self.status.setText("正在通过 yt-dlp 解析视频信息与可用媒体地址……")
+        try:
+            options = {
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "format": "best[height<=1080]/best",
+                "socket_timeout": 25,
+                "extractor_retries": 2,
+            }
+            # Bundle Deno with the portable Windows build when available.
+            deno_path = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "deno.exe")
+            if not os.path.isfile(deno_path):
+                deno_path = shutil.which("deno")
+            if deno_path:
+                options["js_runtimes"] = {"deno": {"path": deno_path}}
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(address, download=False)
+            if not info:
+                raise RuntimeError("yt-dlp 没有返回视频信息")
+            media_url = info.get("url")
+            if media_url:
+                self.add_candidate(media_url)
+            else:
+                requested = info.get("requested_formats") or []
+                formats = requested or info.get("formats") or []
+                usable = [
+                    item for item in formats
+                    if item.get("url") and item.get("vcodec") != "none"
+                ]
+                usable.sort(key=lambda item: (
+                    item.get("height") or 0,
+                    item.get("tbr") or 0
+                ), reverse=True)
+                for item in usable[:12]:
+                    self.add_candidate(item["url"])
+            title = info.get("title") or "视频"
+            if self.candidates:
+                self.status.setText(
+                    f"yt-dlp 解析成功：{title}。已识别 {len(self.candidates)} 个媒体地址。"
+                )
+            else:
+                self.status.setText(
+                    f"已读取视频信息“{title}”，但网站没有提供可直接复制的单一媒体地址。"
+                )
+        except Exception as exc:
+            self.status.setText(
+                f"yt-dlp 解析失败：{exc}\n可尝试更新软件，或检查视频是否公开可访问。"
+            )
 
     def analyze_page(self):
         address = self.url_input.text().strip()
