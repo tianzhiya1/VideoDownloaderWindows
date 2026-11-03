@@ -32,3 +32,8 @@ python main.py
 
 ## 说明与限制
 yt-dlp 和 YouTube 播放器会持续更新，偶尔可能需要升级软件。视频是否可用还受地区、网络、年龄、账号权限及平台策略影响。软件不会绕过 DRM、付费墙、私密内容或其他访问控制。请只下载你有权保存的内容。
+
+
+## YouTube 登录验证（Windows）
+
+如果 YouTube 提示“Sign in to confirm you’re not a bot”，在软件的“YouTube 登录状态”下拉框中选择你已登录 YouTube 的 Chrome、Edge、Firefox 或 Brave，然后点击“下载视频”。请先完全退出所选浏览器，再启动下载，以避免浏览器锁定 Cookie 数据库。软件只在本机读取所选浏览器 Cookie，不会上传 Cookie。Cookie 属于账号凭据，请勿发送给他人；退出账号或 Cookie 过期后，可能需要重新登录。若仍提示验证，可尝试更新浏览器和软件；此功能不绕过 DRM、付费墙或其他访问控制。
