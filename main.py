@@ -133,6 +133,8 @@ class YtDlpDownloadWorker(QObject):
                 "socket_timeout": 30,
                 "retries": 3,
             }
+            if self.cookies_file and os.path.isfile(self.cookies_file):
+                options["cookiefile"] = self.cookies_file
             if deno_path:
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
             if self.browser:
@@ -192,6 +194,7 @@ class MainWindow(QMainWindow):
         self.interceptor = MediaRequestInterceptor(self.signals)
         self.download_thread = None
         self.download_worker = None
+        self.cookies_file = None
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -227,6 +230,7 @@ class MainWindow(QMainWindow):
         url_row.addWidget(analyze_button)
         url_row.addWidget(ytdlp_button)
         url_row.addWidget(self.ytdlp_download_button)
+        url_row.addWidget(cookies_button)
         root.addLayout(url_row)
         cookie_row = QHBoxLayout()
         cookie_row.addWidget(QLabel("YouTube 登录状态："))
@@ -307,6 +311,8 @@ class MainWindow(QMainWindow):
                 deno_path = shutil.which("deno")
             if deno_path:
                 options["js_runtimes"] = {"deno": {"path": deno_path}}
+            if self.cookies_file and os.path.isfile(self.cookies_file):
+                options["cookiefile"] = self.cookies_file
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(address, download=False)
             if not info:
@@ -340,6 +346,29 @@ class MainWindow(QMainWindow):
             self.status.setText(
                 f"yt-dlp 解析失败：{exc}\n可尝试更新软件，或检查视频是否公开可访问。"
             )
+
+    def import_youtube_cookies(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择 YouTube cookies.txt", "", "Cookie 文件 (*.txt);;所有文件 (*)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
+                first_line = handle.readline().strip()
+            if first_line not in ("# Netscape HTTP Cookie File", "# HTTP Cookie File"):
+                QMessageBox.warning(
+                    self, "Cookie 格式不正确",
+                    "请选择 Netscape 格式的 cookies.txt，首行应为 # Netscape HTTP Cookie File。"
+                )
+                return
+            self.cookies_file = path
+            self.status.setText(
+                "YouTube Cookie 已载入。本机下载会使用此登录状态；请勿分享或上传 cookies.txt。"
+            )
+            QMessageBox.information(self, "导入成功", "Cookie 已载入，仅在本机使用。")
+        except Exception as exc:
+            QMessageBox.warning(self, "导入失败", str(exc))
 
     def download_with_ytdlp(self):
         address = self.url_input.text().strip()
